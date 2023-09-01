@@ -7,17 +7,23 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import configparser
 import ClickLabel
+import numpy as np
 
 # Global variables
+Debug = True
 x1_axis_column = ""
 y1_axis_column = ""
 x2_axis_column = ""
 y2_axis_column = ""
 sheet1_name = ""
 sheet2_name = ""
+df1 = []
+df2 = []
+x_new = []
+y_new = []
 plot_canvas = None
-
-
+fig, ax1 = plt.subplots()
+ax2 = ax1.twinx()
 
 # Function to populate sheet names in combo box
 def refresh_sheets():
@@ -122,7 +128,7 @@ def generate_plot():
     try:
         df1 = pd.read_excel(file_path, sheet_name=sheet1_name)
         plt.figure()
-        fig, ax1 = plt.subplots()
+#        fig, ax1 = plt.subplots()
         if series1_sc.get():
             ax1.scatter(df1[x1_axis_column], df1[y1_axis_column], label=y1_axis_column)
         else:
@@ -134,7 +140,7 @@ def generate_plot():
             x2_axis_column = column_combo_x2.get()
             y2_axis_column = column_combo_y2.get()
             if sep_y_axes.get():
-                ax2 = ax1.twinx()
+                #ax2 = ax1.twinx()
                 ax2.set_ylabel(y2_axis_column)
                 if series2_sc.get():
                     ax2.scatter(df2[x2_axis_column], df2[y2_axis_column], color="red", label=y2_axis_column)
@@ -146,17 +152,42 @@ def generate_plot():
                     ax1.scatter(df2[x2_axis_column], df2[y2_axis_column], color="red", label=y2_axis_column)
                 else:
                     ax1.plot(df2[x2_axis_column], df2[y2_axis_column], color="red", label=y2_axis_column)
-
+        if len(x_new) == 0:
+            ax1.plot(x_new, y_new, color="green", label="Fit")
 
         ax1.legend(loc="upper left")
         plt.title(plot_title)
-        labelHandle = ClickLabel.LabelHandler(ax1)
-        plot_canvas = FigureCanvasTkAgg(plt.gcf(), master=plot_frame)
+        #labelHandle = ClickLabel.LabelHandler(ax1)
         plot_canvas.draw()
         plot_canvas.get_tk_widget().pack()
     except Exception as e:
         error_label.config(text=f"Error: {str(e)}")
 
+
+def fitSeriesData():
+    x_pts=[]
+    y_pts=[]
+    file_path = file_path_entry.get()
+    sheet1_name = sheet1_combo.get()
+    df1 = pd.read_excel(file_path, sheet_name=sheet1_name)
+    x1_axis_column = column_combo_x1.get()
+    y1_axis_column = column_combo_y1.get()
+    x = df1[x1_axis_column]
+    y = df1[y1_axis_column]
+    for item in x:
+        x_pts.append(item)
+    for item in y:
+        y_pts.append(item)
+    pyFit = np.polyfit(x_pts,y_pts,4)
+    pyfit = np.poly1d(pyFit)
+    x_new = np.linspace(x_pts[0],x_pts[-1],50)
+    y_new = pyfit(x_new)
+    ax1.set_xlabel("X Axis")
+    ax1.set_ylabel("Y Axis")
+    ax1.set_title("Polynomial Fit to Data")
+    ax1.plot(x_new,y_new,color="green", label="Fit")
+    ax1.legend()
+    plot_canvas.draw()
 
 # Create the main window
 root = tk.Tk()
@@ -169,14 +200,22 @@ plot_frame.pack(side=tk.LEFT, padx=10, pady=10)
 # Create interface frame
 interface_frame = ttk.Frame(root)
 interface_frame.pack(side=tk.LEFT, padx=10, pady=10)
+fp_frame = ttk.Frame(interface_frame)
+fp_frame.pack()
+# sheet1_frame = ttk.Frame(interface_frame)
+# sheet1_frame.pack()
+# sheet2_frame = ttk.Frame(interface_frame)
+# sheet2_frame.pack()
+# y2_frame = ttk.Frame(interface_frame)
+# y2_frame.pack()
 
 # Interface elements
-file_path_label = ttk.Label(interface_frame, text="File Path:")
-file_path_label.grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
-file_path_entry = ttk.Entry(interface_frame)
-file_path_entry.grid(row=0, column=1, padx=5, pady=5)
-browse_button = ttk.Button(interface_frame, text="Browse", command=browse_file)
-browse_button.grid(row=0, column=2, padx=5, pady=5)
+file_path_label = ttk.Label(fp_frame, text="File Path:")
+file_path_label.pack(side=tk.LEFT, padx=5, pady=5)
+file_path_entry = ttk.Entry(fp_frame)
+file_path_entry.pack(side=tk.LEFT, padx=5, pady=5)
+browse_button = ttk.Button(fp_frame, text="Browse", command=browse_file)
+browse_button.pack(side=tk.LEFT, padx=5, pady=5)
 
 series1_label = ttk.Label(interface_frame, text="Series 1")
 series1_label.grid(row=2,column=0,sticky=tk.W, padx=5, pady=5)
@@ -225,22 +264,28 @@ column_combo_y2 = ttk.Combobox(interface_frame, state="readonly")
 column_combo_y2.grid(row=9, column=1, padx=5, pady=5)
 
 sep_y_axes = tk.BooleanVar()
-seperateAxes_label = ttk.Label(interface_frame, text="Seperate Y-Axes")
-seperateAxes_label.grid(row=10, column=0, sticky=tk.W, padx=5, pady=5)
-seperateAxes_checkbox = ttk.Checkbutton(interface_frame,variable=sep_y_axes)
-seperateAxes_checkbox.grid(row=10, column=1, padx=5, pady=5)
+separateAxes_checkbox = ttk.Checkbutton(interface_frame,variable=sep_y_axes, text="Separate Y-Axes")
+separateAxes_checkbox.grid(row=10, column=1, padx=5, pady=5)
 
 title_label = ttk.Label(interface_frame, text="Plot Title:")
 title_label.grid(row=11, column=0, sticky=tk.W, padx=5, pady=5)
 title_entry = ttk.Entry(interface_frame)
 title_entry.grid(row=11, column=1, padx=5, pady=5, columnspan=2)
 
+fit_button = ttk.Button(interface_frame, text="Fit", command=fitSeriesData)
+fit_button.grid(row=12, column = 0, padx=5, pady=10)
 run_button = ttk.Button(interface_frame, text="Run", command=generate_plot)
-run_button.grid(row=12, columnspan=3, padx=5, pady=10)
+run_button.grid(row=12, column=1, padx=5, pady=10)
 
 error_label = ttk.Label(interface_frame, text="", foreground="red")
 error_label.grid(row=13, columnspan=3)
 
+plot_canvas = FigureCanvasTkAgg(plt.gcf(), master=plot_frame)
+
 open_file_ini()
+if Debug:
+    sheet1_combo.set( 'Known_Light')
+    column_combo_x1.set("Index of Refraction")
+    column_combo_y1.set("Wavelength [nm]")
 # Start the GUI event loop
 root.mainloop()
