@@ -8,6 +8,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import configparser
 import ClickLabel
 import numpy as np
+import sv_ttk
 
 # Global variables
 Debug = True
@@ -159,7 +160,7 @@ class UiFrame(tk.Frame):
         self.parent = parent
         self.file_combo = file_combo
         self.series_sc = tk.BooleanVar()
-        self.sheet_frame = sheet_frame = ttk.Frame(self)
+        self.sheet_frame = ttk.Frame(self)
         self.x_column_frame = ttk.Frame(self)
         self.y_column_frame = ttk.Frame(self)
         self.sheet_combo = ttk.Combobox(self.sheet_frame, state="readonly")
@@ -172,7 +173,6 @@ class UiFrame(tk.Frame):
         # Create widgets and layout for the frame
         series_label = ttk.Label(self, text="Series " + str(index))
         series_label.pack(padx=5, pady=5)
-
 
         self.sheet_frame.pack()
         sheet_label = ttk.Label(self.sheet_frame, text="Sheet Name:")
@@ -187,7 +187,7 @@ class UiFrame(tk.Frame):
         x_column_label = ttk.Label(self.x_column_frame,text="X-Axis Column:")
         x_column_label.grid(row=0, column=0, padx=5, pady=5)
 
-        self.x_column_combo.grid(row=0, column=1, padx=5, pady=5)
+        self.x_column_combo.grid(row=0, column=1, columnspan=2, padx=5, pady=5)
 
         self.y_column_frame.pack()
         y_column_label = ttk.Label(self.y_column_frame,text="Y-Axis Column:")
@@ -271,6 +271,8 @@ degree_label.grid(column=0,row=1,sticky=tk.W,padx=5,pady=5)
 degree_input = ttk.Entry(fit_frame)
 degree_input.grid(column=1,row=1,sticky=tk.W,padx=5,pady=5)
 plot_canvas = FigureCanvasTkAgg(plt.gcf(), master=plot_frame)
+
+sv_ttk.set_theme("dark")
 
 open_file_ini()
 if Debug:
