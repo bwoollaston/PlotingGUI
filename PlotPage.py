@@ -9,9 +9,12 @@ import configparser
 import ClickLabel
 import numpy as np
 import sv_ttk
+import textwrap
 
 # Global variables
-Debug = True
+Debug = False
+x_axis_column = ""
+y_axis_column = ""
 series_count = 1
 series_list = []
 x_new = []
@@ -19,6 +22,11 @@ y_new = []
 plot_canvas = None
 fig, ax1 = plt.subplots()
 ax2 = ax1
+line_series1 = None
+line_series2 = None
+line_fit = None
+#legend1 = ax1.legend()
+seriesFit = np.poly1d
 
 # Function to populate sheet names in combo box
 def refresh_sheets():
@@ -66,7 +74,7 @@ def save_last_used_file(file_path):
 
 # Function to generate the plot
 def generate_plot():
-    global plot_canvas
+    global plot_canvas, x_axis_column, y_axis_column, line_series1,line_series2,line_fit
 
     # Clear previous plot
     if plot_canvas:
@@ -74,19 +82,25 @@ def generate_plot():
 
     file_path = file_path_entry.get()
     plot_title = title_entry.get()
+    plot_title = textwrap.fill(plot_title, width=40)
     x_axis_column = series1.x_column_combo.get()
     y_axis_column = series1.y_column_combo.get()
     sheet1_name = series1.sheet_combo.get()
     sheet2_name = series2.sheet_combo.get()
-
+    if line_series1 != None:
+        line_series1.remove()
+    if line_series2 != None:
+        line_series2.remove()
+    if line_fit != None:
+        line_fit.remove()
     try:
         series1.dataFrame = pd.read_excel(file_path, sheet_name=sheet1_name)
         plt.figure()
 #        fig, ax1 = plt.subplots()
         if series1.series_sc.get():
-            ax1.scatter(series1.dataFrame[x_axis_column], series1.dataFrame[y_axis_column], label=y_axis_column)
+            line_series1, = ax1.scatter(series1.dataFrame[x_axis_column], series1.dataFrame[y_axis_column], label=f"{y_axis_column} vs.\n{x_axis_column}")
         else:
-            ax1.plot(series1.dataFrame[x_axis_column], series1.dataFrame[y_axis_column], label = y_axis_column)
+            line_series1, = ax1.plot(series1.dataFrame[x_axis_column], series1.dataFrame[y_axis_column], label=f"{y_axis_column} vs.\n{x_axis_column}")
         ax1.set_xlabel(x_axis_column)
         ax1.set_ylabel(y_axis_column)
         if series2.x_column_combo.get() != "":
@@ -106,12 +120,11 @@ def generate_plot():
                     ax1.scatter(series2.dataFrame[x_axis_column], series2.dataFrame[y_axis_column], color="red", label=y_axis_column)
                 else:
                     ax1.plot(series2.dataFrame[x_axis_column], series2.dataFrame[y_axis_column], color="red", label=y_axis_column)
-        if len(x_new) == 0:
-            ax1.plot(x_new, y_new, color="green", label="Fit")
+        # if len(x_new) == 0:
+        #     line_fit, = ax1.plot(x_new, y_new, color="green", label="Fit")
 
-        ax1.legend(loc="upper left")
-        plt.title(plot_title)
-        #labelHandle = ClickLabel.LabelHandler(ax1)
+        legend1 = ax1.legend(loc="upper right")
+        fig.suptitle(plot_title)
         plot_canvas.draw()
         plot_canvas.get_tk_widget().pack()
     except Exception as e:
@@ -119,6 +132,9 @@ def generate_plot():
 
 
 def fitSeriesData():
+    global seriesFit,line_fit
+    if line_fit != None:
+        line_fit.remove()
     x_pts = []
     y_pts = []
     file_path = file_path_entry.get()
@@ -132,27 +148,39 @@ def fitSeriesData():
         x_pts.append(item)
     for item in y:
         y_pts.append(item)
-    pyFit = np.polyfit(x_pts, y_pts, int(degree_input.get()))
-    pyfit = np.poly1d(pyFit)
+    pyFit = np.polyfit(x_pts, y_pts, int(degree_input.entry.get()))
+    seriesFit = np.poly1d(pyFit)
     x_new = np.linspace(x_pts[0], x_pts[-1], 50)
-    y_new = pyfit(x_new)
-    ax1.set_xlabel("X Axis")
-    ax1.set_ylabel("Y Axis")
-    ax1.set_title("Polynomial Fit to Data")
-    ax1.plot(x_new, y_new, color="green", label="Fit")
-    remove_plt()
+    y_new = seriesFit(x_new)
+    display_polynomial()
+    line_fit, = ax1.plot(x_new, y_new, label=f"Fit {y_axis_column} vs.\n{x_axis_column}")
     ax1.legend()
     plot_canvas.draw()
 
-def remove_plt():
+def evaluate_y():
+    global seriesFit
+    x = float(x_input.entry.get())
+    y = seriesFit(x)
+    y_input.entry.delete(0, "end")
+    y_input.entry.insert(0, str(y))
+def evaluate_x():
+    y = y_input.entry.get()
+    x = y
+    x_input.entry.delete(0, "end")
+    x_input.entry.insert(0, str(x))
+
+def display_polynomial():
+    global seriesFit
+    s = ""
     i = 0
-    for line in ax1.get_lines():
-        ax1.get_lines()[i].remove()
-        i += 1
-    i = 0
-    for line in ax2.get_lines():
-        ax2.get_lines()[i].remove()
-        i += 1
+    j = len(seriesFit.c) - 1
+    for coef in seriesFit.c:
+        if j>0:
+            s += f"{coef}x^{j} + "
+        else:
+            s += f"{coef}"
+        j -= 1
+    polynomial_label.config(text=s)
 
 class UiFrame(tk.Frame):
     def __init__(self, parent, index, file_combo, *args, **kwargs):
@@ -211,6 +239,15 @@ class UiFrame(tk.Frame):
         except Exception as e:
             error_label.config(text=f"Error: {str(e)}")
 
+class Label_entry_item(ttk.Frame):
+    def __init__(self,parent,*args, **kwargs):
+        super().__init__(parent, *args, **kwargs)
+        self.parent = parent
+        self.label = ttk.Label(self, text="")
+        self.label.grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        self.entry = ttk.Entry(self)
+        self.entry.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+
 # Create the main window
 root = tk.Tk()
 root.title("Matplotlib GUI")
@@ -257,20 +294,38 @@ title_entry.grid(row=0, column=1, padx=5, pady=5, columnspan=2)
 
 button_frame = ttk.Frame(interface_frame)
 button_frame.pack()
-fit_button = ttk.Button(button_frame, text="Fit", command=fitSeriesData)
-fit_button.grid(row=0, column = 0, padx=5, pady=10)
+
+
 run_button = ttk.Button(button_frame, text="Run", command=generate_plot)
 run_button.grid(row=0, column=1, padx=5, pady=10)
+
 
 error_label = ttk.Label(interface_frame, text="", foreground="red")
 error_label.pack()
 
 # Fit elements
-degree_label = tk.Label(fit_frame,text="Polynomial Degree")
-degree_label.grid(column=0,row=1,sticky=tk.W,padx=5,pady=5)
-degree_input = ttk.Entry(fit_frame)
-degree_input.grid(column=1,row=1,sticky=tk.W,padx=5,pady=5)
+polynomial_label = ttk.Label(fit_frame,text="")
+polynomial_label.pack()
+
+degree_input = Label_entry_item(fit_frame)
+degree_input.label.config(text="Polynomial Degree")
+degree_input.pack()
+fit_button = ttk.Button(fit_frame, text="Fit", command=fitSeriesData)
+fit_button.pack()
+
 plot_canvas = FigureCanvasTkAgg(plt.gcf(), master=plot_frame)
+
+x_input = Label_entry_item(fit_frame)
+x_input.label.config(text="X Value:")
+x_input.pack()
+evalx_button = ttk.Button(fit_frame, command=evaluate_y, text="Solve f(x)")
+evalx_button.pack()
+
+y_input = Label_entry_item(fit_frame)
+y_input.label.config(text="Y Value:")
+y_input.pack()
+evaly_button = ttk.Button(fit_frame, command=evaluate_x, text="Solve x")
+evaly_button.pack()
 
 sv_ttk.set_theme("dark")
 
